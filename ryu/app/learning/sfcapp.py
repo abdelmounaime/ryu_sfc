@@ -20,6 +20,7 @@ from ryu.lib.packet import in_proto
 
 LABEL = 0
 SFC_TABLE = 5
+TTL=255
 
 class sfc(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
@@ -29,11 +30,13 @@ class sfc(app_manager.RyuApp):
         # initialize mac address table.
         self.mac_to_port = {}
         self.match_table = {}
+        self.switches = {}
         self.label = LABEL
 
     @set_ev_cls(ofp_event.EventOFPSwitchFeatures, CONFIG_DISPATCHER)
     def switch_features_handler(self, ev):
         datapath = ev.msg.datapath
+        self.switches[datapath.id] = datapath
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
         dpid = datapath.id
@@ -67,6 +70,63 @@ class sfc(app_manager.RyuApp):
         self.add_flow(datapath, 0, match, actions)
         self.add_default_match(datapath, self.match_table)
 
+    def install_path_matches(self, dpid, nfp_id, criteria_list):
+        datapath = self.switches[dpid]
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        for criteria in criteria_list:
+            self.logger.info("criteria to add  : %s  ==> path id : %s", criteria, nfp_id)
+            actions = [parser.OFPActionPushMpls(ethertype=34887, type=None, len_=None),
+                       parser.OFPActionSetField(mpls_label=hex(self.label+nfp_id)),
+                       parser.OFPActionSetMplsTtl(TTL)]
+            if criteria["ip-proto"] == "tcp":
+                ip_proto = in_proto.IPPROTO_TCP
+            elif criteria["ip_proto"] == "udp":
+                ip_proto = in_proto.IPPROTO_UDP
+            elif criteria["ip_proto"] == "sctp":
+                ip_proto = in_proto.IPPROTO_SCTP
+            else:
+                ip_proto = in_proto.IPPROTO_NONE
+
+            match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                    in_port=criteria['in_port'],
+                                    ip_proto=ip_proto,
+                                    ipv4_src=criteria["src_ip"],
+                                    ipv4_dst=criteria["dst_ip"],
+                                    tcp_src=criteria["src_port"],
+                                    tcp_dst=criteria["dst_port"]
+                                    )
+
+            inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions),
+                    parser.OFPInstructionGotoTable(SFC_TABLE)]
+
+            mod = parser.OFPFlowMod(
+                datapath=datapath, priority=10, match=match, instructions=inst
+            )
+            datapath.send_msg(mod)
+
+    def install_rendred_path_steps(self, dpid, nfp_id, rendred_path):
+        datapath = self.switches[dpid]
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        rendred_path_length = len(rendred_path)
+        for i, path_element in rendred_path:
+            self.logger.info("path element order : %s, in_port : %s, out_port : %s ", path_element["order"],
+                             path_element["in_port"], path_element["out_port"])
+            if i == rendred_path_length - 1:
+                actions = [parser.OFPActionPopMpls(),
+                           parser.OFPActionOutput(path_element["out_port"])]
+            else:
+                actions = [parser.OFPActionOutput(path_element["out_port"])]
+
+            match = parser.OFPMatch(in_port=path_element["in_port"],
+                                    mpls_label=hex(self.label+nfp_id))
+            inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
+            mod = parser.OFPFlowMod(
+                datapath=datapath, priority=10000, match=match, instructions=inst
+            )
+            datapath.send_msg(mod)
+
     def add_default_match(self,datapath, matchs):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -77,6 +137,7 @@ class sfc(app_manager.RyuApp):
             actions = [parser.OFPActionPushMpls(ethertype=34887, type_=None, len_=None),
                        parser.OFPActionSetField(mpls_label=self.label),
                        ]
+
             self.label = self.label + 10
             if criteria["ip_protocol"] == in_proto.IPPROTO_TCP:
                 match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
