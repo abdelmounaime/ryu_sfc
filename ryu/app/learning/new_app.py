@@ -91,29 +91,37 @@ class sfc_app(app_manager.RyuApp):
         parser = datapath.ofproto_parser
 
         for criteria in criteria_list:
-            #
-            #
-            #
-            #
-            # tcp_src = criteria["source-port"],
-            # tcp_dst = criteria["destination-port"]
             self.logger.info("criteria to add  : %s  ==> path id : %s", criteria, nfp_id)
 
             actions = [parser.OFPActionPushMpls(ethertype=34887, type_=None, len_=None),
-                       parser.OFPActionSetField(mpls_label=self.label + nfp_id),
-                       parser.OFPActionOutput(out_port)]
+                       parser.OFPActionSetField(mpls_label=self.label + nfp_id)]
 
             if criteria["ip_proto"] == "tcp":
-                if  criteria["source-port"] == 0:
+                if  criteria["source-port"] == 0 and criteria['destination-port']==0:
                     match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            )
+                elif criteria["source-port"] == 0:
+                    match = parser.OFPMatch(eth_type = ether_types.ETH_TYPE_IP,
                                             in_port=criteria['in_port'],
                                             ipv4_src=criteria["source-ip-address"],
                                             ipv4_dst=criteria["destination-ip-address"],
                                             ip_proto=in_proto.IPPROTO_TCP,
                                             tcp_dst=criteria["destination-port"]
                                             )
+                elif criteria['destination-port'] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            tcp_src = criteria["source-port"]
+                                            )
                 else:
-                    match = parser.OFPMatch(eth_type = ether_types.ETH_TYPE_IP,
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
                                             in_port=criteria['in_port'],
                                             ipv4_src=criteria["source-ip-address"],
                                             ipv4_dst=criteria["destination-ip-address"],
@@ -122,29 +130,78 @@ class sfc_app(app_manager.RyuApp):
                                             tcp_dst=criteria["destination-port"]
                                             )
             elif criteria["ip_proto"] == "udp":
-                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
-                                        in_port=criteria['in_port'],
-                                        ip_proto=in_proto.IPPROTO_UDP,
-                                        ipv4_src=criteria["source-ip-address"],
-                                        ipv4_dst=criteria["destination-ip-address"],
-                                        udp_src=criteria["source-port"],
-                                        udp_dst=criteria["destination-port"]
-                                        )
+                if criteria["source-port"] == 0 and criteria['destination-port'] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            )
+                elif criteria["source-port"] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            udp_dst=criteria["destination-port"]
+                                            )
+                elif criteria['destination-port'] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            udp_src=criteria["source-port"]
+                                            )
+                else:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            udp_src=criteria["source-port"],
+                                            udp_dst=criteria["destination-port"]
+                                            )
             elif criteria["ip_proto"] == "sctp":
-                match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
-                                        in_port=criteria['in_port'],
-                                        ip_proto=in_proto.IPPROTO_SCTP,
-                                        ipv4_src=criteria["source-ip-address"],
-                                        ipv4_dst=criteria["destination-ip-address"],
-                                        sctp_src=criteria["source-port"],
-                                        sctp_dst=criteria["destination-port"]
-                                        )
+                if criteria["source-port"] == 0 and criteria['destination-port'] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            )
+                elif criteria["source-port"] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            sctp_dst=criteria["destination-port"]
+                                            )
+                elif criteria['destination-port'] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            sctp_src=criteria["source-port"]
+                                            )
+                else:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            sctp_src=criteria["source-port"],
+                                            sctp_dst=criteria["destination-port"]
+                                            )
             else:
                 return "Unknown protocol : ",criteria["ip_proto"]
 
             # print("ip proto : ", ip_proto)
-            # parser.OFPInstructionGotoTable(SFC_TABLE)
-            inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions)]
+            #
+            inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions),
+                    parser.OFPInstructionGotoTable(SFC_TABLE)]
 
             mod = parser.OFPFlowMod(
                 datapath=datapath, priority=1000, match=match, instructions=inst
@@ -152,6 +209,15 @@ class sfc_app(app_manager.RyuApp):
 
             datapath.send_msg(mod)
 
+            mpls_fow_match = parser.OFPMatch(eth_type = ether_types.ETH_TYPE_MPLS,
+                                             mpls_label=self.label + nfp_id)
+            mpls_fow_instructions = [parser.OFPInstructionGotoTable(SFC_TABLE)]
+
+            mpls_flow_mod = parser.OFPFlowMod(
+                datapath=datapath, priority=1000, match=mpls_fow_match, instructions=mpls_fow_instructions
+            )
+
+            datapath.send_msg(mpls_flow_mod)
         return self.label + nfp_id
 
     def delete_path_matches(self, dpid, nfp_id, criteria_list):
@@ -160,32 +226,104 @@ class sfc_app(app_manager.RyuApp):
         for criteria in criteria_list:
             self.logger.info("criteria to delete  : %s  ==> path id : %s", criteria, nfp_id)
             if criteria["ip_proto"] == "tcp":
-                match = parser.OFPMatch(
-                                        in_port=criteria['in_port'],
-                                        ip_proto=in_proto.IPPROTO_TCP,
-                                        ipv4_src=criteria["source-ip-address"],
-                                        ipv4_dst=criteria["destination-ip-address"],
-                                        tcp_src=criteria["source-port"],
-                                        tcp_dst=criteria["destination-port"]
-                                        )
+                if criteria["source-port"] == 0 and criteria['destination-port'] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            )
+                elif criteria["source-port"] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            tcp_dst=criteria["destination-port"]
+                                            )
+                elif criteria['destination-port'] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            tcp_src=criteria["source-port"]
+                                            )
+                else:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            tcp_src=criteria["source-port"],
+                                            tcp_dst=criteria["destination-port"]
+                                            )
             elif criteria["ip_proto"] == "udp":
-                match = parser.OFPMatch(in_port=criteria['in_port'],
-                                        eth_type=ether_types.ETH_TYPE_IP,
-                                        ip_proto=in_proto.IPPROTO_UDP,
-                                        ipv4_src=criteria["source-ip-address"],
-                                        ipv4_dst=criteria["destination-ip-address"],
-                                        udp_src=criteria["source-port"],
-                                        udp_dst=criteria["destination-port"]
-                                        )
+                if criteria["source-port"] == 0 and criteria['destination-port'] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            )
+                elif criteria["source-port"] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            udp_dst=criteria["destination-port"]
+                                            )
+                elif criteria['destination-port'] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            udp_src=criteria["source-port"]
+                                            )
+                else:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            udp_src=criteria["source-port"],
+                                            udp_dst=criteria["destination-port"]
+                                            )
             elif criteria["ip_proto"] == "sctp":
-                match = parser.OFPMatch(in_port=criteria['in_port'],
-                                        eth_type=ether_types.ETH_TYPE_IP,
-                                        ip_proto=in_proto.IPPROTO_SCTP,
-                                        ipv4_src=criteria["source-ip-address"],
-                                        ipv4_dst=criteria["destination-ip-address"],
-                                        sctp_src=criteria["source-port"],
-                                        sctp_dst=criteria["destination-port"]
-                                        )
+                if criteria["source-port"] == 0 and criteria['destination-port'] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            )
+                elif criteria["source-port"] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            sctp_dst=criteria["destination-port"]
+                                            )
+                elif criteria['destination-port'] == 0:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            sctp_src=criteria["source-port"]
+                                            )
+                else:
+                    match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
+                                            in_port=criteria['in_port'],
+                                            ipv4_src=criteria["source-ip-address"],
+                                            ipv4_dst=criteria["destination-ip-address"],
+                                            ip_proto=in_proto.IPPROTO_TCP,
+                                            sctp_src=criteria["source-port"],
+                                            sctp_dst=criteria["destination-port"]
+                                            )
             else:
                 return "Unknown protocol : ", criteria["ip_proto"]
 
@@ -196,30 +334,24 @@ class sfc_app(app_manager.RyuApp):
         parser = datapath.ofproto_parser
         rendred_path_length = len(rendered_path)
         i = 0
-        # for path_element in rendered_path:
-        #
-        #     self.logger.info("path element order : %s, in_port : %s, out_port : %s ", path_element["order"],
-        #                      path_element["in_port"], path_element["out_port"])
-        #     # parser.OFPActionPopMpls(),
-        #     if i == rendred_path_length - 1:
-        #         actions = [
-        #                    parser.OFPActionOutput(path_element["out_port"])]
-        #     else:
-        #         actions = [parser.OFPActionOutput(path_element["out_port"])]
-        #
-        #     i = i + 1
+        for path_element in rendered_path:
+
+            self.logger.info("path element order : %s, in_port : %s, out_port : %s ", path_element["order"],
+                             path_element["in_port"], path_element["out_port"])
+            # parser.OFPActionPopMpls(),
+            if i == rendred_path_length - 1:
+                actions = [parser.OFPActionPopMpls(),
+                           parser.OFPActionOutput(path_element["out_port"])]
+            else:
+                actions = [parser.OFPActionOutput(path_element["out_port"])]
+
+            i = i + 1
         #     # eth_type = ether_types.ETH_TYPE_MPLS,
         #     # mpls_label = self.label + nfp_id
-        #     match = parser.OFPMatch(in_port=path_element["in_port"])
-        #     self.add_flow(datapath=datapath, priority=1000, match=match,actions=actions)
-
-
-        default_mpls_matches = parser.OFPMatch(in_port=3)
-        default_mpls_instructions = [parser.OFPInstructionGotoTable(SFC_TABLE)]
-
-        mod = parser.OFPFlowMod(datapath=datapath, priority=1000,
-                                match=default_mpls_matches, instructions=default_mpls_instructions)
-        datapath.send_msg(mod)
+            match = parser.OFPMatch(eth_type = ether_types.ETH_TYPE_MPLS,
+                                    mpls_label=self.label + nfp_id,
+                                    in_port = path_element["in_port"])
+            self.add_flow(datapath=datapath, priority=1000, match=match,actions=actions, table_id=SFC_TABLE)
         return rendred_path_length
 
     def delete_rendred_path_steps(self, dpid, nfp_id, rendered_path):
