@@ -329,6 +329,10 @@ class sfc_app(app_manager.RyuApp):
 
             self.del_flow(datapath=datapath, match=match)
 
+        mpls_fow_match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_MPLS,
+                                         mpls_label=self.label + nfp_id)
+        self.del_flow(datapath=datapath, match=mpls_fow_match)
+
     def install_rendred_path_steps(self, dpid, nfp_id, rendered_path):
         datapath = self.switches[dpid]
         parser = datapath.ofproto_parser
