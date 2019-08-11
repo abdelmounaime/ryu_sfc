@@ -84,17 +84,17 @@ class sfc_app(app_manager.RyuApp):
         datapath.send_msg(mod)
 
     def install_path_matches(self, dpid, nfp_id, criteria_list, out_port):
-        # print("dpid : ", dpid, " ==> nfp_id :",nfp_id)
+
         datapath = self.switches[dpid]
         print("datapath id is : ", datapath.id)
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
-        eth_VLAN = ether_types.ETH_TYPE_8021Q
 
         for criteria in criteria_list:
             self.logger.info("criteria to add  : %s  ==> path id : %s", criteria, nfp_id)
 
-            actions = [parser.OFPActionSetField(ip_dscp=self.label+nfp_id)]
+            actions = [parser.OFPActionPushMpls(ethertype=34887, type_=None, len_=None),
+                       parser.OFPActionSetField(mpls_label=self.label + nfp_id)]
 
             if criteria["ip_proto"] == "tcp":
                 if  criteria["source-port"] == 0 and criteria['destination-port']==0:
@@ -195,44 +195,10 @@ class sfc_app(app_manager.RyuApp):
                                             sctp_src=criteria["source-port"],
                                             sctp_dst=criteria["destination-port"]
                                             )
-            #elif criteria["ip_proto"] == "icmp":
-               # if criteria["source-port"] == 0 and criteria['destination-port'] == 0:
-               #     match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
-               #                             in_port=criteria['in_port'],
-               #                             ipv4_src=criteria["source-ip-address"],
-               #                             ipv4_dst=criteria["destination-ip-address"],
-               #                             ip_proto=in_proto.IPPROTO_ICMP,
-               #                             )
-               # elif criteria["source-port"] == 0:
-               #     match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
-               #                             in_port=criteria['in_port'],
-               #                             ipv4_src=criteria["source-ip-address"],
-               #                             ipv4_dst=criteria["destination-ip-address"],
-               #                             ip_proto=in_proto.IPPROTO_ICMP,
-               #                             sctp_dst=criteria["destination-port"]
-               #                             )
-               # elif criteria['destination-port'] == 0:
-               #     match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
-               #                             in_port=criteria['in_port'],
-               #                             ipv4_src=criteria["source-ip-address"],
-               #                             ipv4_dst=criteria["destination-ip-address"],
-               #                             ip_proto=in_proto.IPPROTO_ICMP,
-               #                             sctp_src=criteria["source-port"]
-               #                             )
-               # else:
-               #     match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP,
-               #                             in_port=criteria['in_port'],
-               #                             ipv4_src=criteria["source-ip-address"],
-               #                             ipv4_dst=criteria["destination-ip-address"],
-               #                             ip_proto=in_proto.IPPROTO_ICMP,
-               #                             sctp_src=criteria["source-port"],
-               #                             sctp_dst=criteria["destination-port"]
-               #                             )
             else:
                 return "Unknown protocol : ",criteria["ip_proto"]
 
-            # print("ip proto : ", ip_proto)
-            #
+
             inst = [parser.OFPInstructionActions(ofproto.OFPIT_APPLY_ACTIONS, actions),
                     parser.OFPInstructionGotoTable(SFC_TABLE)]
 
@@ -242,8 +208,8 @@ class sfc_app(app_manager.RyuApp):
 
             datapath.send_msg(mod)
 
-            mpls_fow_match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ip_dscp=self.label+nfp_id)
-
+            mpls_fow_match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_MPLS,
+                                             mpls_label=self.label + nfp_id)
             mpls_fow_instructions = [parser.OFPInstructionGotoTable(SFC_TABLE)]
 
             mpls_flow_mod = parser.OFPFlowMod(
@@ -362,23 +328,30 @@ class sfc_app(app_manager.RyuApp):
 
             self.del_flow(datapath=datapath, match=match)
 
-        mpls_fow_match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_IP, ip_dscp=self.label+nfp_id)
-
+        mpls_fow_match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_MPLS,
+                                         mpls_label=self.label + nfp_id)
         self.del_flow(datapath=datapath, match=mpls_fow_match)
 
     def install_rendred_path_steps(self, dpid, nfp_id, rendered_path):
         datapath = self.switches[dpid]
         parser = datapath.ofproto_parser
         rendred_path_length = len(rendered_path)
-
+        i = 0
         for path_element in rendered_path:
 
             self.logger.info("path element order : %s, in_port : %s, out_port : %s ", path_element["order"],
                              path_element["in_port"], path_element["out_port"])
+            if i == rendred_path_length - 1:
+                actions = [parser.OFPActionPopMpls(),
+                           parser.OFPActionOutput(path_element["out_port"])]
+            else:
+                actions = [parser.OFPActionOutput(path_element["out_port"])]
 
-            actions = [parser.OFPActionOutput(path_element["out_port"])]
+            i = i + 1
 
-            match = parser.OFPMatch(in_port=path_element["in_port"],eth_type=ether_types.ETH_TYPE_IP,ip_dscp=self.label + nfp_id)
+            match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_MPLS,
+                                    mpls_label=self.label + nfp_id,
+                                    in_port=path_element["in_port"])
 
             self.add_flow(datapath=datapath, priority=1000, match=match,actions=actions, table_id=SFC_TABLE)
         return rendred_path_length
@@ -390,11 +363,9 @@ class sfc_app(app_manager.RyuApp):
             self.logger.info("path element order : %s, in_port : %s, out_port : %s ", path_element["order"],
                              path_element["in_port"], path_element["out_port"])
 
-            match = parser.OFPMatch(in_port=path_element["in_port"], eth_type=ether_types.ETH_TYPE_IP,
-                                    ip_dscp=self.label + nfp_id)
-
+            match = parser.OFPMatch(eth_type=ether_types.ETH_TYPE_MPLS, in_port=path_element["in_port"],
+                                    mpls_label=self.label + nfp_id)
             self.del_flow(datapath=datapath,match=match, table_id=SFC_TABLE)
-
 
     @set_ev_cls(ofp_event.EventOFPPacketIn, MAIN_DISPATCHER)
     def _packet_in_handler(self, ev):
@@ -473,9 +444,11 @@ class sfc_service(ControllerBase):
         criteria_list = sfp_entry['criteria']
         rendered_path = sfp_entry['rendered_path']
         try:
+
             mpls_label = sfc_app_instance.install_path_matches(dpid,nfp_id,criteria_list, rendered_path[0]["out_port"])
             print("mpls label 2 : ", mpls_label)
             path_hops_number = sfc_app_instance.install_rendred_path_steps(dpid,nfp_id,rendered_path)
+
             res['sfc_path']={}
             res['sfc_path']['name'] = sfp_entry['nfp_name']
             res['sfc_path']['dpid'] = dpid
@@ -515,4 +488,3 @@ class sfc_service(ControllerBase):
         except Exception as e:
             print("error", e)
             return Response(status=500)
-
